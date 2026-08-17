@@ -25,34 +25,64 @@ nonisolated enum Formatter {
         return out
     }
 
-    /// Pretty-prints XML: 2-space indent, attribute order preserved, empty
-    /// elements self-closed, CDATA kept verbatim. An existing XML declaration
-    /// is kept as written; none is added if the input had none.
-    static func xml(_ text: String) throws -> String {
-        let document: XMLDocument
-        do {
-            document = try XMLDocument(xmlString: text, options: [.nodePreserveCDATA, .nodeLoadExternalEntitiesNever])
-        } catch {
-            let ns = error as NSError
-            let detail = (ns.userInfo["NSDebugDescription"] as? String) ?? ns.localizedDescription
-            throw FormatError(message: "Not valid XML: \(detail)")
-        }
+    /// Pretty-prints XML: 2-space indent, empty elements self-closed, CDATA
+    /// kept verbatim, attribute order preserved unless `sortAttributes`. An
+    /// existing XML declaration is kept as written; none is added if the input
+    /// had none.
+    static func xml(_ text: String, sortAttributes sort: Bool = false) throws -> String {
+        let document = try parseXML(text)
+        if sort { sortAttributes(in: document.rootElement()) }
         let pretty = String(
             decoding: document.xmlData(options: [.nodePrettyPrint, .nodeCompactEmptyElement]),
             as: UTF8.self
         )
         // XMLDocument indents with 4 spaces; halve to 2.
-        var output = pretty.split(separator: "\n", omittingEmptySubsequences: false)
+        let output = pretty.split(separator: "\n", omittingEmptySubsequences: false)
             .map { line in
                 let content = line.drop(while: { $0 == " " })
                 return String(repeating: " ", count: (line.count - content.count) / 2) + content
             }
             .joined(separator: "\n")
-        // XMLDocument always emits a declaration; honor what the input had instead.
-        let originalDeclaration = text.firstMatch(of: #/^\s*(<\?xml.*?\?>)/#.dotMatchesNewlines())?.output.1
+        return honorDeclaration(in: output, from: text, separator: "\n")
+    }
+
+    /// Removes all inter-element whitespace, producing single-line XML.
+    /// Declaration handling matches `xml(_:)`.
+    static func minifiedXML(_ text: String) throws -> String {
+        let output = String(
+            decoding: try parseXML(text).xmlData(options: [.nodeCompactEmptyElement]),
+            as: UTF8.self
+        )
+        return honorDeclaration(in: output, from: text, separator: "")
+    }
+
+    private static func parseXML(_ text: String) throws -> XMLDocument {
+        do {
+            return try XMLDocument(xmlString: text, options: [.nodePreserveCDATA, .nodeLoadExternalEntitiesNever])
+        } catch {
+            let ns = error as NSError
+            let detail = (ns.userInfo["NSDebugDescription"] as? String) ?? ns.localizedDescription
+            throw FormatError(message: "Not valid XML: \(detail)")
+        }
+    }
+
+    private static func sortAttributes(in element: XMLElement?) {
+        guard let element else { return }
+        if let attributes = element.attributes, attributes.count > 1 {
+            let sorted = attributes.sorted { ($0.name ?? "") < ($1.name ?? "") }
+            sorted.forEach { $0.detach() }
+            element.attributes = sorted
+        }
+        for child in element.children ?? [] { sortAttributes(in: child as? XMLElement) }
+    }
+
+    /// XMLDocument always emits a declaration; honor what the input had instead.
+    private static func honorDeclaration(in output: String, from input: String, separator: String) -> String {
+        var output = output
+        let original = input.firstMatch(of: #/^\s*(<\?xml.*?\?>)/#.dotMatchesNewlines())?.output.1
         if let emitted = output.firstMatch(of: #/^<\?xml.*?\?>\n?/#.dotMatchesNewlines())?.range {
-            if let originalDeclaration {
-                output.replaceSubrange(emitted, with: originalDeclaration + "\n")
+            if let original {
+                output.replaceSubrange(emitted, with: original + separator)
             } else {
                 output.removeSubrange(emitted)
             }

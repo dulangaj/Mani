@@ -653,7 +653,8 @@ struct FormatterTests {
 
     // Formatter.xml: 2-space indent, attribute order preserved as
     // written (unlike JSON keys, XML attribute order can be semantically
-    // meaningful, e.g. xmlns declarations, so it isn't reordered).
+    // meaningful, e.g. xmlns declarations, so it isn't reordered by
+    // default; sortAttributes: true opts in to alphabetical order).
     // Elements with no children/text self-close as "<tag/>". CDATA is
     // preserved verbatim. A leading XML declaration is kept if present,
     // but never injected if absent — pretty-printing is formatting only,
@@ -708,6 +709,40 @@ struct FormatterTests {
         #expect(!result.hasPrefix("<?xml"))
     }
 
+    @Test func xmlSortAttributesSortsRecursively() throws {
+        let input = #"<root z="1" a="2"><item b="two" a="one">text</item></root>"#
+        let expected = """
+<root a="2" z="1">
+  <item a="one" b="two">text</item>
+</root>
+"""
+        #expect(try Formatter.xml(input, sortAttributes: true) == expected)
+    }
+
+    // Formatter.minifiedXML: strips inter-element whitespace into one
+    // line. Declaration handling matches xml(): kept if present, never
+    // injected.
+
+    @Test func xmlMinifyCollapsesToOneLine() throws {
+        let input = """
+<root>
+  <a>1</a>
+  <empty/>
+</root>
+"""
+        #expect(try Formatter.minifiedXML(input) == "<root><a>1</a><empty/></root>")
+    }
+
+    @Test func xmlMinifyPreservesDeclarationWhenPresent() throws {
+        let input = """
+<?xml version="1.0"?>
+<root>
+  <a>1</a>
+</root>
+"""
+        #expect(try Formatter.minifiedXML(input) == #"<?xml version="1.0"?><root><a>1</a></root>"#)
+    }
+
     @Test(arguments: [
         "<root><a></root>",
         "<root>",
@@ -716,5 +751,6 @@ struct FormatterTests {
     ])
     func xmlInvalidThrows(_ input: String) throws {
         #expect(throws: (any Error).self) { try Formatter.xml(input) }
+        #expect(throws: (any Error).self) { try Formatter.minifiedXML(input) }
     }
 }

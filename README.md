@@ -2,7 +2,7 @@
 
 A macOS scratchpad for manipulating text. Paste into the editor, reshape it, copy it out.
 
-**Format** pretty-prints JSON (optionally with sorted keys), minifies JSON, and pretty-prints XML.
+**Format** pretty-prints and minifies JSON and XML, with options to sort JSON keys and XML attributes.
 
 **Replace** removes newlines or spaces, unescapes JSON and shell strings, strips ANSI escape sequences, decodes URLs, strips invisible Unicode, and changes case.
 

@@ -35,7 +35,9 @@ struct ContentView: View {
                 Button("Format JSON (Sort Keys)") { run("Format JSON (Sort Keys)") { try Formatter.json($0, sortKeys: true) } }
                 Button("Minify JSON") { run("Minify JSON", Formatter.minifiedJSON) }
                 Divider()
-                Button("Format XML") { run("Format XML", Formatter.xml) }
+                Button("Format XML") { run("Format XML") { try Formatter.xml($0) } }
+                Button("Format XML (Sort Attributes)") { run("Format XML (Sort Attributes)") { try Formatter.xml($0, sortAttributes: true) } }
+                Button("Minify XML") { run("Minify XML", Formatter.minifiedXML) }
             }
             .fixedSize()
             .help("Pretty-print the text, or the selection if there is one")
