@@ -31,7 +31,8 @@ struct ContentView: View {
             statusText
             Spacer()
             Menu("Format") {
-                Button("Format JSON") { run("Format JSON", Formatter.json) }
+                Button("Format JSON") { run("Format JSON") { try Formatter.json($0) } }
+                Button("Format JSON (Sort Keys)") { run("Format JSON (Sort Keys)") { try Formatter.json($0, sortKeys: true) } }
                 Button("Minify JSON") { run("Minify JSON", Formatter.minifiedJSON) }
                 Divider()
                 Button("Format XML") { run("Format XML", Formatter.xml) }

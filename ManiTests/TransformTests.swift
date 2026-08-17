@@ -505,9 +505,20 @@ struct FormatterTests {
 
     // Formatter.json: 2-space indent, "key": value (no space before the
     // colon — the more common convention than JSONSerialization's
-    // default "key" : value), object keys sorted, "/" not escaped.
-    // Array element order is preserved as written. Parsing is strict
-    // RFC 8259 JSON — no trailing commas, no comments.
+    // default "key" : value), "/" not escaped. Key and array element
+    // order preserved as written; sortKeys: true sorts object keys.
+    // Parsing is strict RFC 8259 JSON — no trailing commas, no comments.
+
+    @Test func jsonPrettyPrintPreservesKeyOrderByDefault() throws {
+        let input = #"{"b":2,"a":1}"#
+        let expected = """
+{
+  "b": 2,
+  "a": 1
+}
+"""
+        #expect(try Formatter.json(input) == expected)
+    }
 
     @Test func jsonPrettyPrintSortsKeysAndIndentsNestedArray() throws {
         let input = #"{"b":2,"a":1,"c":[3,2,1]}"#
@@ -522,7 +533,7 @@ struct FormatterTests {
   ]
 }
 """
-        #expect(try Formatter.json(input) == expected)
+        #expect(try Formatter.json(input, sortKeys: true) == expected)
     }
 
     @Test func jsonPrettyPrintNestedObjectsAndArrays() throws {
@@ -590,7 +601,7 @@ struct FormatterTests {
   "t": true
 }
 """
-        #expect(try Formatter.json(input) == expected)
+        #expect(try Formatter.json(input, sortKeys: true) == expected)
     }
 
     // A bare top-level scalar is valid JSON text (RFC 8259) and is
@@ -637,7 +648,7 @@ struct FormatterTests {
     @Test func jsonMinifyThenPrettyRoundTripsToSortedForm() throws {
         let input = #"{"b":2,"a":1,"c":[1,2]}"#
         let minified = try Formatter.minifiedJSON(input)
-        #expect(try Formatter.json(minified) == Formatter.json(input))
+        #expect(try Formatter.json(minified, sortKeys: true) == Formatter.json(input, sortKeys: true))
     }
 
     // Formatter.xml: 2-space indent, attribute order preserved as

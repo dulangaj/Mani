@@ -8,12 +8,13 @@ nonisolated struct FormatError: LocalizedError {
 /// Pretty-printers that can fail. Failures throw; the caller must leave the
 /// buffer untouched and surface the message.
 nonisolated enum Formatter {
-    /// Pretty-prints JSON: 2-space indent, keys sorted, empty containers
-    /// inline. Scalar tokens are re-emitted verbatim, so number precision and
-    /// string escapes survive byte-exact. Bare top-level scalars are valid.
-    static func json(_ text: String) throws -> String {
+    /// Pretty-prints JSON: 2-space indent, empty containers inline, key order
+    /// preserved unless `sortKeys`. Scalar tokens are re-emitted verbatim, so
+    /// number precision and string escapes survive byte-exact. Bare top-level
+    /// scalars are valid.
+    static func json(_ text: String, sortKeys: Bool = false) throws -> String {
         var out = ""
-        emit(try JSONParser.parse(text), indent: 0, into: &out)
+        emit(try JSONParser.parse(text), indent: 0, sortKeys: sortKeys, into: &out)
         return out
     }
 
@@ -61,7 +62,7 @@ nonisolated enum Formatter {
 
     // MARK: - JSON emission
 
-    private static func emit(_ value: JSONParser.Value, indent: Int, into out: inout String) {
+    private static func emit(_ value: JSONParser.Value, indent: Int, sortKeys: Bool, into out: inout String) {
         switch value {
         case .scalar(let raw):
             out += raw
@@ -71,7 +72,7 @@ nonisolated enum Formatter {
             out += "[\n"
             for (i, item) in items.enumerated() {
                 out += pad + "  "
-                emit(item, indent: indent + 1, into: &out)
+                emit(item, indent: indent + 1, sortKeys: sortKeys, into: &out)
                 out += i == items.count - 1 ? "\n" : ",\n"
             }
             out += pad + "]"
@@ -79,11 +80,11 @@ nonisolated enum Formatter {
             guard !entries.isEmpty else { out += "{}"; return }
             let pad = String(repeating: "  ", count: indent)
             out += "{\n"
-            let sorted = entries.sorted { $0.key < $1.key }
-            for (i, entry) in sorted.enumerated() {
+            let ordered = sortKeys ? entries.sorted { $0.key < $1.key } : entries
+            for (i, entry) in ordered.enumerated() {
                 out += pad + "  " + entry.key + ": "
-                emit(entry.value, indent: indent + 1, into: &out)
-                out += i == sorted.count - 1 ? "\n" : ",\n"
+                emit(entry.value, indent: indent + 1, sortKeys: sortKeys, into: &out)
+                out += i == ordered.count - 1 ? "\n" : ",\n"
             }
             out += pad + "}"
         }
