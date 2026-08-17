@@ -6,6 +6,8 @@ A macOS scratchpad for manipulating text. Paste into the editor, reshape it, cop
 
 **Replace** removes newlines or spaces, unescapes JSON and shell strings, strips ANSI escape sequences, decodes URLs, strips invisible Unicode, and changes case.
 
+**Organize** rewrites the text as structured Markdown using the on-device Apple Intelligence model. It requires Apple Intelligence to be enabled, and nothing leaves the machine.
+
 Every action is undoable and applies to the selection when there is one. The status bar shows live character and line counts. Invalid JSON or XML never touches your text; errors surface in a banner instead.
 
 ## Build it yourself

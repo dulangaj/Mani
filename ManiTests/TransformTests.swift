@@ -754,3 +754,17 @@ struct FormatterTests {
         #expect(throws: (any Error).self) { try Formatter.minifiedXML(input) }
     }
 }
+
+@Suite("Organizer")
+struct OrganizerTests {
+    @Test func unfencedStripsWholeAnswerFence() {
+        #expect(Organizer.unfenced("```markdown\n# Title\n\n- item\n```") == "# Title\n\n- item")
+        #expect(Organizer.unfenced("```\ntext\n```") == "text")
+    }
+
+    @Test func unfencedLeavesInnerFencesAndPlainTextAlone() {
+        let mixed = "# Title\n\n```swift\nlet x = 1\n```"
+        #expect(Organizer.unfenced(mixed) == mixed)
+        #expect(Organizer.unfenced("  plain\n") == "plain")
+    }
+}

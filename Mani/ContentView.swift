@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var editor = EditorController()
     @State private var didJustCopy = false
     @State private var copyFeedbackTask: Task<Void, Never>?
+    @State private var isOrganizing = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,6 +53,7 @@ struct ContentView: View {
             }
             .fixedSize()
             .help("Apply a cleanup to the text, or the selection if there is one")
+            organizeButton
             copyButton
         }
         .disabled(text.isEmpty)
@@ -78,6 +80,20 @@ struct ContentView: View {
         .help("Copy all text to the clipboard (⇧⌘C)")
     }
 
+    private var organizeButton: some View {
+        Button {
+            organize()
+        } label: {
+            if isOrganizing {
+                ProgressView().controlSize(.small)
+            } else {
+                Label("Organize", systemImage: "sparkles")
+            }
+        }
+        .disabled(isOrganizing)
+        .help("Rewrite the text, or the selection, as Markdown with the on-device Apple Intelligence model")
+    }
+
     private func errorBanner(_ message: String) -> some View {
         HStack {
             Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -97,6 +113,19 @@ struct ContentView: View {
             formatError = nil
         } catch {
             formatError = error.localizedDescription
+        }
+    }
+
+    private func organize() {
+        isOrganizing = true
+        Task { @MainActor in
+            do {
+                try await editor.apply("Organize", Organizer.markdown)
+                formatError = nil
+            } catch {
+                formatError = error.localizedDescription
+            }
+            isOrganizing = false
         }
     }
 

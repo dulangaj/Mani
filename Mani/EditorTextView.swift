@@ -23,6 +23,27 @@ final class EditorController {
         textView.undoManager?.setActionName(actionName)
         textView.setSelectedRange(NSRange(location: range.location, length: (output as NSString).length))
     }
+
+    /// Async variant for transforms that take time. The buffer stays editable
+    /// while `body` runs; the result is dropped if the source text changed.
+    func apply(_ actionName: String, _ body: (String) async throws -> String) async throws {
+        guard let textView else { return }
+        let storage = textView.string as NSString
+        let selected = textView.selectedRange()
+        let range = selected.length > 0 ? selected : NSRange(location: 0, length: storage.length)
+        let input = storage.substring(with: range)
+        let output = try await body(input)
+        let current = textView.string as NSString
+        guard NSMaxRange(range) <= current.length, current.substring(with: range) == input else {
+            throw FormatError(message: "The text changed while organizing; result discarded.")
+        }
+        guard output != input,
+              textView.shouldChangeText(in: range, replacementString: output) else { return }
+        textView.textStorage?.replaceCharacters(in: range, with: output)
+        textView.didChangeText()
+        textView.undoManager?.setActionName(actionName)
+        textView.setSelectedRange(NSRange(location: range.location, length: (output as NSString).length))
+    }
 }
 
 /// Plain-text NSTextView host: monospaced, no smart substitutions, with the
