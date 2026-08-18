@@ -64,15 +64,18 @@ final class EditorController {
         textView.undoManager?.setActionName(actionName)
         textView.setSelectedRange(NSRange(location: range.location, length: (output as NSString).length))
     }
-    /// Replaces every range with `replacement`, as one undo step. The ranges are
-    /// applied back to front so the earlier ones stay valid as the text shrinks.
-    func replace(_ ranges: [NSRange], with replacement: String, actionName: String) {
-        guard let textView, !ranges.isEmpty else { return }
-        let ordered = ranges.sorted { $0.location < $1.location }
-        guard textView.shouldChangeText(inRanges: ordered as [NSValue],
-                                        replacementStrings: ordered.map { _ in replacement }) else { return }
-        for range in ordered.reversed() {
-            textView.textStorage?.replaceCharacters(in: range, with: replacement)
+    /// Applies every replacement, as one undo step. Each range carries its own
+    /// string, so strip (every string empty) and a future replace (each string
+    /// from its own match) are the same call. The ranges must be disjoint; they
+    /// are applied back to front so the earlier ones stay valid as the text
+    /// changes length under them.
+    func replace(_ replacements: [(range: NSRange, string: String)], actionName: String) {
+        guard let textView, !replacements.isEmpty else { return }
+        let ordered = replacements.sorted { $0.range.location < $1.range.location }
+        guard textView.shouldChangeText(inRanges: ordered.map { NSValue(range: $0.range) },
+                                        replacementStrings: ordered.map(\.string)) else { return }
+        for (range, string) in ordered.reversed() {
+            textView.textStorage?.replaceCharacters(in: range, with: string)
         }
         textView.didChangeText()
         textView.undoManager?.setActionName(actionName)
@@ -84,22 +87,21 @@ final class EditorController {
         textView?.scrollRangeToVisible(range)
     }
 
+    /// Painting a document's worth of hits is pure cost past the first few
+    /// hundred: the bar still counts them all, and stepping repaints anyway.
+    private static let highlightCap = 500
+
     /// Paints every match, as a TextKit 2 rendering attribute rather than a real
-    /// one, so the document and its undo stack stay untouched. Painting is per
-    /// range and invalidates layout each time, so a pattern with thousands of
-    /// hits shows the first few hundred; the strip bar still counts them all.
+    /// one, so the document and its undo stack stay untouched.
     ///
-    /// `current` is painted last, and in red, so the hit the strip bar is
+    /// `current` is painted last, and in red, so the hit the find bar is
     /// sitting on reads differently from the rest of them.
     func highlight(_ ranges: [NSRange], current: NSRange? = nil) {
-        guard let layout = textView?.textLayoutManager,
+        guard let textView, let layout = textView.textLayoutManager,
               let content = layout.textContentManager else { return }
         for key in [NSAttributedString.Key.backgroundColor, .foregroundColor] {
             layout.removeRenderingAttribute(key, for: content.documentRange)
         }
-        // Removing an attribute does not repaint what was already drawn, and
-        // invalidating discards whatever is set at the time, so the clear has to
-        // happen before the new highlight goes on.
         layout.invalidateRenderingAttributes(for: content.documentRange)
         func paint(_ range: NSRange, _ background: NSColor, _ foreground: NSColor) {
             guard let textRange = content.textRange(range) else { return }
@@ -108,14 +110,17 @@ final class EditorController {
         }
         // The system find colour, specified to be read with black text: a
         // translucent wash is invisible against monospaced text.
-        for range in ranges.prefix(500) {
+        for range in ranges.prefix(Self.highlightCap) {
             paint(range, .findHighlightColor, .black)
         }
         if let current {
             paint(current, .systemRed, .white)
         }
+        // Neither removing nor adding a rendering attribute repaints fragments
+        // already on screen — without this, a new highlight only shows once
+        // something else forces a redraw, such as stepping scrolling the view.
+        textView.needsDisplay = true
     }
-
 }
 
 /// Plain-text NSTextView host: monospaced, no smart substitutions, with the

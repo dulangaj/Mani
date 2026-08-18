@@ -1,6 +1,6 @@
 import Foundation
 
-/// How the strip field reads what you typed. Two modes, the pair every editor
+/// How a find field reads what you typed. Two modes, the pair every editor
 /// that does this well offers: a literal string, and a regular expression.
 nonisolated enum MatchMode: String, CaseIterable, Identifiable, Sendable {
     case plain = "Text"
@@ -9,9 +9,11 @@ nonisolated enum MatchMode: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 }
 
-/// A search over the document. Both modes run through `NSRegularExpression`, so
-/// a literal search is an escaped pattern and the two paths cannot drift apart.
-nonisolated struct StripPattern: Sendable, Equatable {
+/// A search over the document: what to look for, not what to do about it, so
+/// strip today and replace tomorrow share one definition of "a hit". Both modes
+/// run through `NSRegularExpression` — a literal search is an escaped pattern —
+/// so the two paths cannot drift apart.
+nonisolated struct FindPattern: Sendable, Equatable {
     var text = ""
     var mode = MatchMode.plain
     var isCaseSensitive = false
@@ -19,7 +21,7 @@ nonisolated struct StripPattern: Sendable, Equatable {
 
     /// Every hit, in document order. Empty matches are dropped: a pattern like
     /// `x*` matches between every pair of characters, which would report
-    /// hundreds of hits and strip none of them.
+    /// hundreds of hits and act on none of them.
     func ranges(in string: String) throws -> [NSRange] {
         guard !text.isEmpty else { return [] }
         let expression = try NSRegularExpression(

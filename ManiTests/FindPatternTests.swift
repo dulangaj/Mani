@@ -3,22 +3,22 @@ import Foundation
 @testable import Mani
 
 private func pattern(_ text: String, _ mode: MatchMode = .plain,
-                     caseSensitive: Bool = false, wholeWord: Bool = false) -> StripPattern {
-    StripPattern(text: text, mode: mode, isCaseSensitive: caseSensitive, isWholeWord: wholeWord)
+                     caseSensitive: Bool = false, wholeWord: Bool = false) -> FindPattern {
+    FindPattern(text: text, mode: mode, isCaseSensitive: caseSensitive, isWholeWord: wholeWord)
 }
 
 /// The matched text, which is what a reader of a failing test wants to see.
-private func hits(_ pattern: StripPattern, in text: String) throws -> [String] {
+private func hits(_ pattern: FindPattern, in text: String) throws -> [String] {
     try pattern.ranges(in: text).map { (text as NSString).substring(with: $0) }
 }
 
 /// Location and length in UTF-16 units, which is what `NSTextView` is handed.
-private func spans(_ pattern: StripPattern, in text: String) throws -> [[Int]] {
+private func spans(_ pattern: FindPattern, in text: String) throws -> [[Int]] {
     try pattern.ranges(in: text).map { [$0.location, $0.length] }
 }
 
-@Suite("Strip patterns")
-struct StripPatternTests {
+@Suite("Find patterns")
+struct FindPatternTests {
     @Test func findsEveryLiteralOccurrence() throws {
         #expect(try spans(pattern("ab"), in: "ab cab ab") == [[0, 2], [4, 2], [7, 2]])
     }
@@ -43,7 +43,7 @@ struct StripPatternTests {
     }
 
     @Test func emptyPatternMatchesNothing() throws {
-        #expect(try StripPattern().ranges(in: "anything").isEmpty)
+        #expect(try FindPattern().ranges(in: "anything").isEmpty)
     }
 
     /// A pattern that can match nothing at all reports no hits rather than one
@@ -55,8 +55,8 @@ struct StripPatternTests {
 }
 
 /// The text this app is actually pointed at: notes, logs, and pasted Markdown.
-@Suite("Strip patterns, real text")
-struct StripRealTextTests {
+@Suite("Find patterns, real text")
+struct FindRealTextTests {
     private let notes = """
         See [the docs](https://example.com/a_b?x=1&y=2) and [issue 42](http://jira.local/ABC-42).
         Run `swift build`, then `swift test`; binaries land in C:\\Users\\me\\bin or /usr/local/bin.
@@ -116,8 +116,8 @@ struct StripRealTextTests {
 /// The ranges go straight to `NSTextView`, which counts in UTF-16, while Swift
 /// counts in characters. Everything here would be off by one or worse if the
 /// two were ever confused.
-@Suite("Strip patterns, offsets")
-struct StripOffsetTests {
+@Suite("Find patterns, offsets")
+struct FindOffsetTests {
     @Test(arguments: [
         ("b", "a😀b😀c", [[3, 1]]),
         ("😀", "a😀b😀c", [[1, 2], [4, 2]]),
@@ -162,8 +162,8 @@ struct StripOffsetTests {
     }
 }
 
-@Suite("Strip patterns, case")
-struct StripCaseTests {
+@Suite("Find patterns, case")
+struct FindCaseTests {
     @Test func loosensUntilCaseIsAsked() throws {
         #expect(try hits(pattern("log"), in: "log LOG Log") == ["log", "LOG", "Log"])
         #expect(try hits(pattern("log", caseSensitive: true), in: "log LOG Log") == ["log"])
@@ -201,8 +201,8 @@ struct StripCaseTests {
     }
 }
 
-@Suite("Strip patterns, whole word")
-struct StripWholeWordTests {
+@Suite("Find patterns, whole word")
+struct FindWholeWordTests {
     @Test func skipsSubstrings() throws {
         #expect(try spans(pattern("cat", wholeWord: true), in: "cat concatenate cat.") == [[0, 3], [16, 3]])
     }
@@ -232,8 +232,8 @@ struct StripWholeWordTests {
     }
 }
 
-@Suite("Strip patterns, regex")
-struct StripRegexTests {
+@Suite("Find patterns, regex")
+struct FindRegexTests {
     @Test(arguments: [
         (#"\d+"#, "a1 b22 c333", ["1", "22", "333"]),
         (#"(a)\1"#, "aa a aaa", ["aa", "aa"]),
@@ -258,11 +258,11 @@ struct StripRegexTests {
     }
 }
 
-@Suite("Strip controller")
+@Suite("Find controller")
 @MainActor
-struct StripControllerTests {
-    private func controller(_ text: String, _ pattern: StripPattern) -> StripController {
-        let controller = StripController()
+struct FindControllerTests {
+    private func controller(_ text: String, _ pattern: FindPattern) -> FindController {
+        let controller = FindController()
         controller.pattern = pattern
         controller.refresh(in: text)
         return controller
