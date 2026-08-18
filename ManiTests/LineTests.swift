@@ -11,6 +11,7 @@
 //   * Dedupe keeps the first occurrence, preserves order, compares exactly,
 //     and does collapse repeated blank lines.
 
+import Foundation
 import Testing
 @testable import Mani
 

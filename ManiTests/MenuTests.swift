@@ -5,6 +5,7 @@
 // invisible, and a duplicated label or an empty group renders as a subtly
 // broken menu rather than as a failure.
 
+import Foundation
 import Testing
 @testable import Mani
 

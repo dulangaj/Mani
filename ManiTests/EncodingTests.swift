@@ -10,6 +10,7 @@
 //     them.
 //   * HTML unescaping is total: an entity it does not know is left alone.
 
+import Foundation
 import Testing
 @testable import Mani
 

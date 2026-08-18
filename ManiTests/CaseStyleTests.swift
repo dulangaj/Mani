@@ -6,10 +6,10 @@
 //     digit→UPPER start a word; a capital run splits before its last letter
 //     when a lowercase follows; digits attach to the word in front of them.
 //   * Title Case is a different algorithm — in place, punctuation-preserving,
-//     apostrophes are word characters — which is why Foundation's own
-//     .capitalized is not used.
+//     apostrophes are word characters.
 //   * Slugify folds diacritics but keeps non-Latin scripts.
 
+import Foundation
 import Testing
 @testable import Mani
 
@@ -99,10 +99,8 @@ struct TitleCaseTests {
         #expect(Transform.toTitleCase.apply(to: "the quick brown fox.") == "The Quick Brown Fox.")
     }
 
-    // Foundation's .capitalized yields "Don'T" here; ours must not.
     @Test func apostrophesAreWordCharacters() {
         #expect(Transform.toTitleCase.apply(to: "don't stop") == "Don't Stop")
-        #expect(Transform.toTitleCase.apply(to: "don't stop") != "don't stop".capitalized)
     }
 
     @Test func curlyApostrophesCountToo() {

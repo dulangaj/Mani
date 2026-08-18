@@ -11,6 +11,7 @@
 //   * There is deliberately no uniform empty-input rule here: the two decoders
 //     that can round-trip empty do, and the other three reject it.
 
+import Foundation
 import Testing
 @testable import Mani
 

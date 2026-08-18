@@ -4,6 +4,7 @@
 // was added: a trailing newline still opens a final, empty line. A word is a
 // maximal run of non-whitespace, so "state-of-the-art" counts once.
 
+import Foundation
 import Testing
 @testable import Mani
 

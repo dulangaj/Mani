@@ -2,6 +2,7 @@
 // These tests define the API — see the accompanying decisions summary
 // for every place a behaviour was ambiguous and had to be pinned down.
 
+import Foundation
 import Testing
 @testable import Mani
 
