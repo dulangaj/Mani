@@ -10,8 +10,11 @@ import Testing
 @Suite("Transform Contract")
 struct TransformContractTests {
 
-    @Test func allSixteenCasesArePresent() {
-        #expect(Transform.allCases.count == 16)
+    // A deliberate tripwire: adding a case must force a decision about which
+    // menu it belongs in, which is what MenuTests then checks.
+    @Test func allCasesAreAccountedFor() {
+        #expect(Transform.allCases.count == 33)
+        #expect(Conversion.allCases.count == 5)
     }
 
     @Test func idsAreUnique() {
@@ -28,7 +31,11 @@ struct TransformContractTests {
     // Idempotency holds for these transforms on non-adversarial input.
     // unescapeJSONString, escapeJSONString, unescapeShell, encodeURL and
     // decodeURL are intentionally excluded — see their dedicated
-    // non-idempotence tests below for why.
+    // non-idempotence tests below for why. So are reverseLines, shuffleLines
+    // and numberLines (each re-applies its effect), base64Encode, hexEncode
+    // and the digests (each re-encodes its own output), unescapeHTML
+    // (&amp;lt; unwraps one layer at a time), and toCamelCase/toPascalCase
+    // (pinned individually in CaseStyleTests instead).
     @Test(arguments: [
         (Transform.removeNewlines, "a\nb\r\nc"),
         (Transform.joinLines, "a\n\nb  \n  c"),
@@ -41,6 +48,15 @@ struct TransformContractTests {
         (Transform.stripANSI, "\u{1B}[1mBold\u{1B}[0m"),
         (Transform.toUppercase, "Hello World"),
         (Transform.toLowercase, "Hello World"),
+        (Transform.sortLines, "b\na\nc"),
+        (Transform.sortLinesDescending, "b\na\nc"),
+        (Transform.removeDuplicateLines, "a\nb\na"),
+        (Transform.toSnakeCase, "fooBar baz"),
+        (Transform.toKebabCase, "fooBar baz"),
+        (Transform.toConstantCase, "fooBar baz"),
+        (Transform.toSlug, "Hello, World!"),
+        (Transform.toTitleCase, "the quick brown fox"),
+        (Transform.escapeHTML, "plain text"),
     ])
     func idempotentTransforms(transform: Transform, input: String) {
         let once = transform.apply(to: input)
