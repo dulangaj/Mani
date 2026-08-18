@@ -8,6 +8,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+pkill -x Mani 2>/dev/null || true
+
 CONFIGURATION="${CONFIGURATION:-Release}"
 DERIVED_DATA="${DERIVED_DATA:-.derived}"
 INSTALL_DIR="${INSTALL_DIR:-/Applications}"
