@@ -53,8 +53,12 @@ nonisolated enum ContentKind: String, CaseIterable, Sendable {
         return opening.hasPrefix("<!doctype html") || opening.hasPrefix("<html") ? .html : .xml
     }
 
+    /// Ten digits is Unix seconds since 2001, nineteen is nanoseconds until
+    /// 2262, so the window spans every unit the Timestamp submenu offers. It
+    /// also catches long numeric ids, which costs nothing: the label is a
+    /// guess, and every operation those ids might want stays enabled.
     private static func isTimestamp(_ text: String) -> Bool {
-        (10...13).contains(text.utf8.count) && text.allSatisfy(\.isNumber)
+        (10...19).contains(text.utf8.count) && text.allSatisfy(\.isNumber)
     }
 
     private static func isISODate(_ text: String) -> Bool {

@@ -61,7 +61,8 @@ struct MenuTests {
         #expect(Menus.convert.flatMap { $0 }.count == 11)
         #expect(Menus.decoders.flatMap { $0 }.count == 3)
         #expect(Menus.hashes.count == 4)
-        #expect(Menus.all.count == 48)
+        #expect(Menus.timestamps.flatMap { $0 }.count == 8)
+        #expect(Menus.all.count == 56)
     }
 
     // The cheapest available substitute for launching the app: nothing in any

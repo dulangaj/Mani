@@ -99,6 +99,7 @@ struct ContentView: View {
                 }
                 Divider()
                 items(Menus.decoders)
+                Menu("Timestamp") { items(Menus.timestamps) }
             }
             .fixedSize()
             .help("Re-encode the text, or the selection if there is one")

@@ -105,6 +105,29 @@ nonisolated enum Menus {
         ) { Digests.hex($0, algorithm) }
     }
 
+    /// The second submenu, for the same reason as `hashes`: eight rows of one
+    /// idea, in two symmetric directions, should not be eight rows of a menu
+    /// you are scanning. The auto-detecting entry stays outside it, since
+    /// pasting a number without thinking about its unit is the common case.
+    static let timestamps: [[TextOperation]] = [
+        TimestampUnit.allCases.map { unit in
+            TextOperation(
+                id: "timestamp.from.\(unit.rawValue)",
+                label: "\(unit.rawValue) → Date",
+                help: "Read the number as Unix \(unit.rawValue.lowercased()) and convert it to an ISO 8601 date in UTC",
+                kinds: [.timestamp]
+            ) { try Timestamps.date(from: $0, unit: unit) }
+        },
+        TimestampUnit.allCases.map { unit in
+            TextOperation(
+                id: "timestamp.to.\(unit.rawValue)",
+                label: "Date → \(unit.rawValue)",
+                help: "Convert an ISO 8601 date to Unix \(unit.rawValue.lowercased())",
+                kinds: [.isoDate]
+            ) { try Timestamps.timestamp(from: $0, unit: unit) }
+        },
+    ]
+
     static let decoders: [[TextOperation]] = [
         [TextOperation(Conversion.jwtDecode, kinds: [.jwt]),
          TextOperation(Conversion.timestampToDate, kinds: [.timestamp]),
@@ -114,7 +137,8 @@ nonisolated enum Menus {
     /// Flattened union, for the tests that check nothing was implemented and
     /// then forgotten on the way to a menu.
     static let all: [TextOperation] =
-        format.flatMap { $0 } + text.flatMap { $0 } + convert.flatMap { $0 } + hashes + decoders.flatMap { $0 }
+        format.flatMap { $0 } + text.flatMap { $0 } + convert.flatMap { $0 }
+        + hashes + decoders.flatMap { $0 } + timestamps.flatMap { $0 }
 
     private static func operations(_ transforms: Transform...) -> [TextOperation] {
         transforms.map { TextOperation($0) }

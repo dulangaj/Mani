@@ -75,43 +75,29 @@ nonisolated enum Conversion: CaseIterable, Identifiable, Sendable {
 
     // MARK: - Timestamps
 
-    /// UTC and whole seconds. Local time was rejected as ambiguous for logs and
-    /// untestable across machines. Values too large to be seconds are read as
-    /// milliseconds: 1e11 seconds is the year 5138, so nothing real collides.
+    /// UTC. Local time was rejected as ambiguous for logs and untestable across
+    /// machines. The unit is inferred by magnitude, each rung being a thousand
+    /// years past anything real: 1e11 seconds is the year 5138, so a value that
+    /// large is milliseconds, and so on up. Pick the explicit command in the
+    /// Timestamp submenu when you know the unit and want it obeyed.
     private static func date(fromTimestamp text: String) throws -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.wholeMatch(of: #/[+-]?\d+(?:\.\d+)?/#) != nil,
-              let value = Double(trimmed), value.isFinite else {
+        guard let value = Timestamps.wholeTicks(trimmed) else {
             throw FormatError(message: "Not a Unix timestamp: expected a number of seconds.")
         }
-        let seconds = (abs(value) >= 1e11 ? value / 1000 : value).rounded(.towardZero)
-        return formatter(with: [.withInternetDateTime])
-            .string(from: Date(timeIntervalSince1970: seconds))
+        return try Timestamps.date(from: trimmed, unit: unit(for: value))
     }
 
-    /// The whole selection is treated as one value. Rewriting every timestamp
-    /// inside a log is a different, larger feature.
-    private static func timestamp(fromDate text: String) throws -> String {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let attempts: [ISO8601DateFormatter.Options] = [
-            [.withInternetDateTime],
-            [.withInternetDateTime, .withFractionalSeconds],
-            [.withFullDate],
-        ]
-        for options in attempts {
-            if let date = formatter(with: options).date(from: trimmed) {
-                return String(Int(date.timeIntervalSince1970.rounded(.towardZero)))
-            }
+    private static func unit(for value: Int64) -> TimestampUnit {
+        switch value.magnitude {
+        case ..<100_000_000_000: .seconds
+        case ..<100_000_000_000_000: .milliseconds
+        case ..<100_000_000_000_000_000: .microseconds
+        default: .nanoseconds
         }
-        throw FormatError(message: "Not an ISO 8601 date: expected something like 2023-11-14T22:13:20Z.")
     }
 
-    /// Built per call rather than cached: `ISO8601DateFormatter` is a mutable
-    /// reference type and not `Sendable`, and these run once per menu click.
-    private static func formatter(with options: ISO8601DateFormatter.Options) -> ISO8601DateFormatter {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = options
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter
+    private static func timestamp(fromDate text: String) throws -> String {
+        try Timestamps.timestamp(from: text, unit: .seconds)
     }
 }

@@ -4,8 +4,8 @@
 //   * A JWT decodes to one JSON object, {"header": …, "payload": …}, so the
 //     output is itself valid JSON that Mani's other actions can chew on.
 //   * The signature is never verified and claim timestamps are never expanded.
-//   * Timestamps are UTC, ISO 8601, whole seconds. Values too large to be
-//     seconds are read as milliseconds.
+//   * Timestamps are UTC and ISO 8601. The auto entry infers the unit by
+//     magnitude, up through nanoseconds; the Timestamp submenu states it.
 //   * The whole selection is one value; timestamps embedded in a log are not
 //     rewritten in place.
 //   * There is deliberately no uniform empty-input rule here: the two decoders
