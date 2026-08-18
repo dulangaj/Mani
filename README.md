@@ -12,7 +12,11 @@ The bottom bar holds three menus, split by what you are trying to do.
 
 **Organize** rewrites the text as structured Markdown using the on-device Apple Intelligence model. It requires Apple Intelligence to be enabled, and nothing leaves the machine.
 
-Every action is undoable and applies to the selection when there is one. The status bar shows live character, word and line counts. Anything that can fail — invalid JSON or XML, malformed Base64, a token that is not a token — never touches your text; the error surfaces in a banner instead.
+Press ⇧⌘P, or Edit > Search Commands, to open the command palette. Type to filter: your letters have to appear in the command's name in order, but not next to each other, so `fjsk` finds Format JSON (Sort Keys). Arrows or ⌃N and ⌃P move, Page Up and Page Down move by eight, Home and End jump to the ends, Return runs, Escape closes.
+
+The app guesses what the text is, judging the selection when there is one, and offers only the commands that fit it. With JSON on screen the XML formatters grey out, and Decode JWT is offered only for something shaped like a token. The guess is a heuristic, so it defers: anything it cannot identify, including ordinary prose, leaves every command available.
+
+Every action is undoable and applies to the selection when there is one. The status bar shows live character, word and line counts, plus a guess at what the text is (JSON, XML, HTML, JWT, Base64, hex, URL, Unix timestamp) when it recognizes the shape. Anything that can fail — invalid JSON or XML, malformed Base64, a token that is not a token — never touches your text; the error surfaces in a banner instead.
 
 ## Build it yourself
 

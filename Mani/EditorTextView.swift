@@ -4,8 +4,28 @@ import AppKit
 /// Bridges the transform menus to the hosted NSTextView so every change flows
 /// through the view's own undo machinery.
 @MainActor
+@Observable
 final class EditorController {
     weak var textView: NSTextView?
+
+    /// The current selection, or nil when nothing is selected. Operations run
+    /// on the selection when there is one, so this is what content detection
+    /// has to judge — a base64 field inside a JSON document is base64.
+    private(set) var selectedText: String?
+
+    /// Returns focus to the document, which an overlay takes away.
+    func focus() {
+        guard let textView else { return }
+        textView.window?.makeFirstResponder(textView)
+    }
+
+    func selectionChanged() {
+        guard let textView else { return }
+        let range = textView.selectedRange()
+        selectedText = range.length > 0
+            ? (textView.string as NSString).substring(with: range)
+            : nil
+    }
 
     /// Applies `body` to the selection, or the whole document when nothing is
     /// selected, then selects the replaced range so the change is visible.
@@ -89,6 +109,11 @@ struct EditorTextView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+            parent.controller.selectionChanged()
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            parent.controller.selectionChanged()
         }
     }
 }

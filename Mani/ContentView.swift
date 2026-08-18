@@ -7,6 +7,20 @@ struct ContentView: View {
     @State private var didJustCopy = false
     @State private var copyFeedbackTask: Task<Void, Never>?
     @State private var isOrganizing = false
+    @State private var isSearching = false
+
+    /// Sentinel palette entry for Organize, which runs async and cannot be a
+    /// plain `TextOperation`; `run(_:)` special-cases the id.
+    private static let organizeCommand = TextOperation(
+        id: "organize", label: "Organize",
+        help: "Rewrite the text, or the selection, as Markdown with the on-device Apple Intelligence model"
+    ) { $0 }
+
+    /// Cached, because every menu item and every palette row asks whether it
+    /// applies: as a computed property this ran detection some forty-five times
+    /// per keystroke. It is recomputed only when the text or the selection
+    /// actually changes.
+    @State private var kind: ContentKind?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,7 +31,27 @@ struct ContentView: View {
             Divider()
             bottomBar
         }
-        .onChange(of: text) { formatError = nil }
+        .onChange(of: text) {
+            formatError = nil
+            detectKind()
+        }
+        .onChange(of: editor.selectedText) { detectKind() }
+        .onAppear(perform: detectKind)
+        .focusedSceneValue(\.isSearching, $isSearching)
+        .overlay {
+            if isSearching {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.12)
+                        .onTapGesture(perform: dismissPalette)
+                    CommandPalette(
+                        commands: availableCommands,
+                        onRun: run,
+                        onDismiss: dismissPalette
+                    )
+                    .padding(.top, 24)
+                }
+            }
+        }
         .task(id: text) {
             try? await Task.sleep(for: .seconds(1))
             ScratchpadFile.save(text)
@@ -31,6 +65,23 @@ struct ContentView: View {
         HStack(spacing: 12) {
             statusText
             Spacer()
+            Button {
+                isSearching.toggle()
+            } label: {
+                Label("Search Commands", systemImage: "magnifyingglass")
+                    .labelStyle(.iconOnly)
+            }
+            .help("Search all commands (⇧⌘P)")
+            editingControls
+        }
+        .padding(8)
+    }
+
+    /// Everything here needs text to work on; the palette does not, so it sits
+    /// outside this group and stays reachable with an empty buffer.
+    @ViewBuilder
+    private var editingControls: some View {
+        Group {
             Menu("Format") { items(Menus.format) }
                 .fixedSize()
                 .help("Pretty-print structured data, or the selection if there is one")
@@ -55,7 +106,6 @@ struct ContentView: View {
             copyButton
         }
         .disabled(text.isEmpty)
-        .padding(8)
     }
 
     /// Renders one menu's groups, separated by dividers.
@@ -66,12 +116,13 @@ struct ContentView: View {
             ForEach(group) { operation in
                 Button(operation.label) { run(operation) }
                     .help(operation.help)
+                    .disabled(!operation.isEnabled(for: kind))
             }
         }
     }
 
     private var statusText: some View {
-        Text(TextStats.summary(for: text))
+        Text(TextStats.summary(for: text, kind: kind))
             .font(.callout)
             .foregroundStyle(.secondary)
             .monospacedDigit()
@@ -99,7 +150,7 @@ struct ContentView: View {
             }
         }
         .disabled(isOrganizing)
-        .help("Rewrite the text, or the selection, as Markdown with the on-device Apple Intelligence model")
+        .help(Self.organizeCommand.help)
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -115,7 +166,24 @@ struct ContentView: View {
 
     // MARK: - Actions
 
+    /// Organize is left out while one is already running, since the palette has
+    /// no way to show the spinner the button does.
+    private var availableCommands: [TextOperation] {
+        let commands = isOrganizing ? Menus.all : Menus.all + [Self.organizeCommand]
+        return commands.filter { $0.isEnabled(for: kind) }
+    }
+
+    private func detectKind() {
+        kind = ContentKind.detect(editor.selectedText ?? text)
+    }
+
+    private func dismissPalette() {
+        isSearching = false
+        editor.focus()
+    }
+
     private func run(_ operation: TextOperation) {
+        guard operation.id != Self.organizeCommand.id else { return organize() }
         do {
             try editor.apply(operation.label, operation.run)
             formatError = nil

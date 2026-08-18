@@ -8,25 +8,38 @@ nonisolated struct TextOperation: Identifiable, Sendable {
     let id: String
     let label: String
     let help: String
+    /// The content kinds this operation reads, or `nil` when it takes any text
+    /// at all. Only set it where detection can positively recognise the input:
+    /// an empty set here means "always offer this", not "never".
+    let kinds: Set<ContentKind>?
     let run: @Sendable (String) throws -> String
 
-    init(id: String, label: String, help: String, run: @escaping @Sendable (String) throws -> String) {
+    init(id: String, label: String, help: String, kinds: Set<ContentKind>? = nil,
+         run: @escaping @Sendable (String) throws -> String) {
         self.id = id
         self.label = label
         self.help = help
+        self.kinds = kinds
         self.run = run
     }
 
-    init(_ transform: Transform) {
-        self.init(id: "transform.\(transform)", label: transform.label, help: transform.help) {
+    init(_ transform: Transform, kinds: Set<ContentKind>? = nil) {
+        self.init(id: "transform.\(transform)", label: transform.label, help: transform.help, kinds: kinds) {
             transform.apply(to: $0)
         }
     }
 
-    init(_ conversion: Conversion) {
-        self.init(id: "conversion.\(conversion)", label: conversion.label, help: conversion.help) {
+    init(_ conversion: Conversion, kinds: Set<ContentKind>? = nil) {
+        self.init(id: "conversion.\(conversion)", label: conversion.label, help: conversion.help, kinds: kinds) {
             try conversion.apply(to: $0)
         }
+    }
+
+    /// Unknown content enables everything, because the guess is a heuristic and
+    /// a wrong guess must never be able to hide an operation you wanted.
+    func isEnabled(for kind: ContentKind?) -> Bool {
+        guard let kind, let kinds else { return true }
+        return kinds.contains(kind)
     }
 }
 
@@ -40,22 +53,26 @@ nonisolated struct TextOperation: Identifiable, Sendable {
 /// re-represent it". Decode always precedes encode, matching reality — you
 /// receive the gross thing more often than you produce it.
 nonisolated enum Menus {
+    /// HTML is offered to the XML formatters too: it often parses, and refusing
+    /// to try is worse than the error banner you get when it does not.
+    private static let markup: Set<ContentKind> = [.xml, .html]
+
     static let format: [[TextOperation]] = [
         [
             TextOperation(id: "format.json", label: "Format JSON",
-                          help: "Pretty-print JSON, preserving key order") { try Formatter.json($0) },
+                          help: "Pretty-print JSON, preserving key order", kinds: [.json]) { try Formatter.json($0) },
             TextOperation(id: "format.jsonSorted", label: "Format JSON (Sort Keys)",
-                          help: "Pretty-print JSON with every object's keys sorted") { try Formatter.json($0, sortKeys: true) },
+                          help: "Pretty-print JSON with every object's keys sorted", kinds: [.json]) { try Formatter.json($0, sortKeys: true) },
             TextOperation(id: "format.jsonMinified", label: "Minify JSON",
-                          help: "Strip all whitespace outside strings") { try Formatter.minifiedJSON($0) },
+                          help: "Strip all whitespace outside strings", kinds: [.json]) { try Formatter.minifiedJSON($0) },
         ],
         [
             TextOperation(id: "format.xml", label: "Format XML",
-                          help: "Pretty-print XML, preserving attribute order") { try Formatter.xml($0) },
+                          help: "Pretty-print XML, preserving attribute order", kinds: markup) { try Formatter.xml($0) },
             TextOperation(id: "format.xmlSorted", label: "Format XML (Sort Attributes)",
-                          help: "Pretty-print XML with every element's attributes sorted") { try Formatter.xml($0, sortAttributes: true) },
+                          help: "Pretty-print XML with every element's attributes sorted", kinds: markup) { try Formatter.xml($0, sortAttributes: true) },
             TextOperation(id: "format.xmlMinified", label: "Minify XML",
-                          help: "Strip inter-element whitespace, producing one line") { try Formatter.minifiedXML($0) },
+                          help: "Strip inter-element whitespace, producing one line", kinds: markup) { try Formatter.minifiedXML($0) },
         ],
     ]
 
@@ -70,8 +87,8 @@ nonisolated enum Menus {
     ]
 
     static let convert: [[TextOperation]] = [
-        [TextOperation(Conversion.base64Decode), TextOperation(Transform.base64Encode),
-         TextOperation(Conversion.hexDecode), TextOperation(Transform.hexEncode)],
+        [TextOperation(Conversion.base64Decode, kinds: [.base64]), TextOperation(Transform.base64Encode),
+         TextOperation(Conversion.hexDecode, kinds: [.hex]), TextOperation(Transform.hexEncode)],
         [TextOperation(Transform.decodeURL), TextOperation(Transform.encodeURL),
          TextOperation(Transform.unescapeHTML), TextOperation(Transform.escapeHTML),
          TextOperation(Transform.unescapeJSONString), TextOperation(Transform.escapeJSONString),
@@ -89,7 +106,9 @@ nonisolated enum Menus {
     }
 
     static let decoders: [[TextOperation]] = [
-        conversions(.jwtDecode, .timestampToDate, .dateToTimestamp),
+        [TextOperation(Conversion.jwtDecode, kinds: [.jwt]),
+         TextOperation(Conversion.timestampToDate, kinds: [.timestamp]),
+         TextOperation(Conversion.dateToTimestamp, kinds: [.isoDate])],
     ]
 
     /// Flattened union, for the tests that check nothing was implemented and
@@ -99,9 +118,5 @@ nonisolated enum Menus {
 
     private static func operations(_ transforms: Transform...) -> [TextOperation] {
         transforms.map { TextOperation($0) }
-    }
-
-    private static func conversions(_ conversions: Conversion...) -> [TextOperation] {
-        conversions.map { TextOperation($0) }
     }
 }
