@@ -22,7 +22,7 @@ struct ContentView: View {
             try? await Task.sleep(for: .seconds(1))
             ScratchpadFile.save(text)
         }
-        .frame(minWidth: 480, minHeight: 320)
+        .frame(minWidth: 560, minHeight: 320)
     }
 
     // MARK: - Bottom bar
@@ -31,28 +31,26 @@ struct ContentView: View {
         HStack(spacing: 12) {
             statusText
             Spacer()
-            Menu("Format") {
-                Button("Format JSON") { run("Format JSON") { try Formatter.json($0) } }
-                Button("Format JSON (Sort Keys)") { run("Format JSON (Sort Keys)") { try Formatter.json($0, sortKeys: true) } }
-                Button("Minify JSON") { run("Minify JSON", Formatter.minifiedJSON) }
+            Menu("Format") { items(Menus.format) }
+                .fixedSize()
+                .help("Pretty-print structured data, or the selection if there is one")
+            Menu("Text") { items(Menus.text) }
+                .fixedSize()
+                .help("Reshape the text, or the selection if there is one")
+            Menu("Convert") {
+                items(Menus.convert)
                 Divider()
-                Button("Format XML") { run("Format XML") { try Formatter.xml($0) } }
-                Button("Format XML (Sort Attributes)") { run("Format XML (Sort Attributes)") { try Formatter.xml($0, sortAttributes: true) } }
-                Button("Minify XML") { run("Minify XML", Formatter.minifiedXML) }
-            }
-            .fixedSize()
-            .help("Pretty-print the text, or the selection if there is one")
-            Menu("Replace") {
-                ForEach(Array(Transform.groups.enumerated()), id: \.offset) { index, group in
-                    if index > 0 { Divider() }
-                    ForEach(group) { transform in
-                        Button(transform.label) { run(transform.label) { transform.apply(to: $0) } }
-                            .help(transform.help)
+                Menu("Hash") {
+                    ForEach(Menus.hashes) { operation in
+                        Button(operation.label) { run(operation) }
+                            .help(operation.help)
                     }
                 }
+                Divider()
+                items(Menus.decoders)
             }
             .fixedSize()
-            .help("Apply a cleanup to the text, or the selection if there is one")
+            .help("Re-encode the text, or the selection if there is one")
             organizeButton
             copyButton
         }
@@ -60,10 +58,20 @@ struct ContentView: View {
         .padding(8)
     }
 
+    /// Renders one menu's groups, separated by dividers.
+    @ViewBuilder
+    private func items(_ groups: [[TextOperation]]) -> some View {
+        ForEach(Array(groups.enumerated()), id: \.offset) { index, group in
+            if index > 0 { Divider() }
+            ForEach(group) { operation in
+                Button(operation.label) { run(operation) }
+                    .help(operation.help)
+            }
+        }
+    }
+
     private var statusText: some View {
-        let lines = text.isEmpty ? 0 : text.split(separator: "\n", omittingEmptySubsequences: false).count
-        return Text("\(text.count.formatted()) \(text.count == 1 ? "character" : "characters")"
-            + " · \(lines.formatted()) \(lines == 1 ? "line" : "lines")")
+        Text(TextStats.summary(for: text))
             .font(.callout)
             .foregroundStyle(.secondary)
             .monospacedDigit()
@@ -107,9 +115,9 @@ struct ContentView: View {
 
     // MARK: - Actions
 
-    private func run(_ name: String, _ body: (String) throws -> String) {
+    private func run(_ operation: TextOperation) {
         do {
-            try editor.apply(name, body)
+            try editor.apply(operation.label, operation.run)
             formatError = nil
         } catch {
             formatError = error.localizedDescription

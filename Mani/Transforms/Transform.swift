@@ -1,7 +1,18 @@
 import Foundation
 
-/// A one-shot, non-failing text transformation offered in the Replace menu.
+/// A one-shot, non-failing text transformation. Totality is the contract here:
+/// every case maps any input to some output, which is what lets the whole menu
+/// be driven without a `try`. Operations that can legitimately reject their
+/// input live in `Conversion` instead.
 nonisolated enum Transform: CaseIterable, Identifiable, Sendable {
+    // Lines
+    case sortLines
+    case sortLinesDescending
+    case reverseLines
+    case shuffleLines
+    case removeDuplicateLines
+    case numberLines
+    // Line endings and whitespace
     case normalizeLineEndings
     case removeNewlines
     case joinLines
@@ -9,28 +20,40 @@ nonisolated enum Transform: CaseIterable, Identifiable, Sendable {
     case trimLines
     case collapseSpaces
     case removeSpaces
+    // Escapes and encodings
     case unescapeJSONString
     case escapeJSONString
     case unescapeShell
     case stripANSI
     case decodeURL
     case encodeURL
+    case unescapeHTML
+    case escapeHTML
+    case base64Encode
+    case hexEncode
+    // Junk
     case stripInvisibles
+    // Case
     case toUppercase
     case toLowercase
+    case toTitleCase
+    case toCamelCase
+    case toPascalCase
+    case toSnakeCase
+    case toKebabCase
+    case toConstantCase
+    case toSlug
 
     var id: Self { self }
 
-    /// Menu sections, in display order.
-    static let groups: [[Transform]] = [
-        [.normalizeLineEndings, .removeNewlines, .joinLines, .removeEmptyLines, .trimLines, .collapseSpaces, .removeSpaces],
-        [.unescapeJSONString, .escapeJSONString, .unescapeShell, .stripANSI, .decodeURL, .encodeURL],
-        [.stripInvisibles],
-        [.toUppercase, .toLowercase],
-    ]
-
     var label: String {
         switch self {
+        case .sortLines: "Sort Lines A\u{2192}Z"
+        case .sortLinesDescending: "Sort Lines Z\u{2192}A"
+        case .reverseLines: "Reverse Line Order"
+        case .shuffleLines: "Shuffle Lines"
+        case .removeDuplicateLines: "Remove Duplicate Lines"
+        case .numberLines: "Number Lines"
         case .normalizeLineEndings: "Normalize Line Endings"
         case .removeNewlines: "Remove Newlines"
         case .joinLines: "Join Lines with Space"
@@ -44,14 +67,31 @@ nonisolated enum Transform: CaseIterable, Identifiable, Sendable {
         case .stripANSI: "Strip Terminal Escapes"
         case .decodeURL: "Decode URL Percent-Encoding"
         case .encodeURL: "Encode URL Percent-Encoding"
+        case .unescapeHTML: "Unescape HTML Entities"
+        case .escapeHTML: "Escape HTML Entities"
+        case .base64Encode: "Base64 Encode"
+        case .hexEncode: "Encode as Hex Bytes"
         case .stripInvisibles: "Remove Invisible Characters"
         case .toUppercase: "Uppercase"
         case .toLowercase: "Lowercase"
+        case .toTitleCase: "Title Case"
+        case .toCamelCase: "camelCase"
+        case .toPascalCase: "PascalCase"
+        case .toSnakeCase: "snake_case"
+        case .toKebabCase: "kebab-case"
+        case .toConstantCase: "CONSTANT_CASE"
+        case .toSlug: "Slugify"
         }
     }
 
     var help: String {
         switch self {
+        case .sortLines: "Sort lines alphabetically, ignoring case and ordering embedded numbers naturally"
+        case .sortLinesDescending: "Sort lines in reverse alphabetical order"
+        case .reverseLines: "Put the last line first and the first line last"
+        case .shuffleLines: "Reorder the lines at random"
+        case .removeDuplicateLines: "Keep the first copy of each line and delete the rest, preserving order"
+        case .numberLines: "Prefix every line with its number, right-aligned"
         case .normalizeLineEndings: "Convert Windows (CRLF) and old Mac (CR) line endings to Unix (LF)"
         case .removeNewlines: "Delete line breaks without adding spaces"
         case .joinLines: "Join all lines, separating them with a single space"
@@ -65,14 +105,37 @@ nonisolated enum Transform: CaseIterable, Identifiable, Sendable {
         case .stripANSI: "Remove ANSI terminal color codes, cursor moves, and hyperlinks"
         case .decodeURL: "Turn %20, %2F, %C3%A9 and friends back into characters"
         case .encodeURL: "Percent-encode everything except unreserved URL characters"
+        case .unescapeHTML: "Turn &amp;, &#8212; and other HTML entities into real characters"
+        case .escapeHTML: "Escape &, <, >, \" and ' as HTML entities"
+        case .base64Encode: "Encode the UTF-8 bytes as Base64, including any trailing newline"
+        case .hexEncode: "Encode the UTF-8 bytes as lowercase hex pairs"
         case .stripInvisibles: "Strip zero-width characters, BOMs, and bidi marks; convert non-breaking spaces to spaces"
         case .toUppercase: "Convert all text to uppercase"
         case .toLowercase: "Convert all text to lowercase"
+        case .toTitleCase: "Capitalize the first letter of every word, leaving punctuation alone"
+        case .toCamelCase: "Rewrite each line as a camelCase identifier"
+        case .toPascalCase: "Rewrite each line as a PascalCase identifier"
+        case .toSnakeCase: "Rewrite each line as a snake_case identifier"
+        case .toKebabCase: "Rewrite each line as a kebab-case identifier"
+        case .toConstantCase: "Rewrite each line as a CONSTANT_CASE identifier"
+        case .toSlug: "Rewrite each line as a URL slug, folding accents to plain letters"
         }
     }
 
     func apply(to text: String) -> String {
         switch self {
+        case .sortLines:
+            Lines.sorted(text)
+        case .sortLinesDescending:
+            Lines.sorted(text, descending: true)
+        case .reverseLines:
+            Lines.reversed(text)
+        case .shuffleLines:
+            Lines.shuffled(text)
+        case .removeDuplicateLines:
+            Lines.deduplicated(text)
+        case .numberLines:
+            Lines.numbered(text)
         case .normalizeLineEndings:
             text.replacing(#/\R/#, with: "\n")
         case .removeNewlines:
@@ -105,16 +168,38 @@ nonisolated enum Transform: CaseIterable, Identifiable, Sendable {
             text.removingPercentEncoding ?? text
         case .encodeURL:
             text.addingPercentEncoding(withAllowedCharacters: Self.urlUnreserved) ?? text
+        case .unescapeHTML:
+            HTMLEntities.unescaped(text)
+        case .escapeHTML:
+            HTMLEntities.escaped(text)
+        case .base64Encode:
+            Bytes.base64Encoded(text)
+        case .hexEncode:
+            Bytes.hexEncoded(text)
         case .stripInvisibles:
             Self.strippedInvisibles(text)
         case .toUppercase:
             text.uppercased()
         case .toLowercase:
             text.lowercased()
+        case .toTitleCase:
+            CaseStyle.title(text)
+        case .toCamelCase:
+            CaseStyle.camel(text)
+        case .toPascalCase:
+            CaseStyle.pascal(text)
+        case .toSnakeCase:
+            CaseStyle.snake(text)
+        case .toKebabCase:
+            CaseStyle.kebab(text)
+        case .toConstantCase:
+            CaseStyle.constant(text)
+        case .toSlug:
+            CaseStyle.slug(text)
         }
     }
 
-    /// RFC 3986 unreserved characters — everything else gets percent-encoded.
+        /// RFC 3986 unreserved characters — everything else gets percent-encoded.
     private static let urlUnreserved = CharacterSet(
         charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
     )
