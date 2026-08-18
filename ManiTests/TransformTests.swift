@@ -784,4 +784,43 @@ struct OrganizerTests {
         #expect(Organizer.unfenced(mixed) == mixed)
         #expect(Organizer.unfenced("  plain\n") == "plain")
     }
+
+    @Test func targetsHaveDistinctLabels() {
+        #expect(Set(OrganizeTarget.allCases.map(\.label)).count == OrganizeTarget.allCases.count)
+    }
+}
+
+@Suite("Slack mrkdwn")
+struct SlackMarkdownTests {
+    @Test(arguments: [
+        ("**bold**", "*bold*"),
+        ("*italic*", "_italic_"),
+        ("~~gone~~", "~gone~"),
+        ("[Slack](https://slack.com)", "[Slack](https://slack.com)"),
+        ("## Heading", "*Heading*"),
+        ("- item", "• item"),
+        ("  * nested", "  • nested"),
+        ("1. first", "1. first"),
+        ("**bold** and *italic*", "*bold* and _italic_"),
+    ])
+    func rewritesToSlackSyntax(_ input: String, _ expected: String) {
+        #expect(SlackMarkdown.from(input) == expected)
+    }
+
+    @Test func stripsParagraphTags() {
+        #expect(SlackMarkdown.from("<p>Shipped it.</p>") == "Shipped it.")
+        #expect(SlackMarkdown.from("one<br/>two") == "onetwo")
+        #expect(SlackMarkdown.from("<p>- item</p>") == "• item")
+    }
+
+    @Test func leavesCodeAlone() {
+        #expect(SlackMarkdown.from("`a * b * c`") == "`a * b * c`")
+        let fenced = "```swift\nlet x = a * b * c\n// **not bold**\n```"
+        #expect(SlackMarkdown.from(fenced) == fenced)
+    }
+
+    @Test func rewritesAroundAFence() {
+        let input = "# Title\n\n```\n**kept**\n```\n\n**changed**"
+        #expect(SlackMarkdown.from(input) == "*Title*\n\n```\n**kept**\n```\n\n*changed*")
+    }
 }

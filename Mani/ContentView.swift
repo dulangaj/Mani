@@ -9,12 +9,14 @@ struct ContentView: View {
     @State private var isOrganizing = false
     @State private var isSearching = false
 
-    /// Sentinel palette entry for Organize, which runs async and cannot be a
-    /// plain `TextOperation`; `run(_:)` special-cases the id.
-    private static let organizeCommand = TextOperation(
-        id: "organize", label: "Organize",
-        help: "Rewrite the text, or the selection, as Markdown with the on-device Apple Intelligence model"
-    ) { $0 }
+    private static let organizePrefix = "organize."
+
+    /// Sentinel palette entries for Organize, which runs async and so cannot be
+    /// a plain `TextOperation`; `run(_:)` special-cases the id prefix.
+    private static let organizeCommands: [TextOperation] = OrganizeTarget.allCases.map { target in
+        TextOperation(id: organizePrefix + target.rawValue,
+                      label: "Organize as \(target.label)", help: target.help) { $0 }
+    }
 
     /// Cached, because every menu item and every palette row asks whether it
     /// applies: as a computed property this ran detection some forty-five times
@@ -63,6 +65,9 @@ struct ContentView: View {
 
     private var bottomBar: some View {
         HStack(spacing: 12) {
+            if isOrganizing {
+                ProgressView().controlSize(.small)
+            }
             statusText
             Spacer()
             Button {
@@ -103,7 +108,7 @@ struct ContentView: View {
             }
             .fixedSize()
             .help("Re-encode the text, or the selection if there is one")
-            organizeButton
+            organizeMenu
             copyButton
         }
         .disabled(text.isEmpty)
@@ -140,18 +145,18 @@ struct ContentView: View {
         .help("Copy all text to the clipboard (⇧⌘C)")
     }
 
-    private var organizeButton: some View {
-        Button {
-            organize()
-        } label: {
-            if isOrganizing {
-                ProgressView().controlSize(.small)
-            } else {
-                Label("Organize", systemImage: "sparkles")
+    /// A `Menu` cannot swap its label for a spinner the way the old button did,
+    /// so the running indicator lives in the bottom bar instead.
+    private var organizeMenu: some View {
+        Menu("Organize") {
+            ForEach(OrganizeTarget.allCases) { target in
+                Button(target.label) { organize(target) }
+                    .help(target.help)
             }
         }
+        .fixedSize()
         .disabled(isOrganizing)
-        .help(Self.organizeCommand.help)
+        .help("Rewrite the text, or the selection, with the on-device Apple Intelligence model")
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -170,7 +175,7 @@ struct ContentView: View {
     /// Organize is left out while one is already running, since the palette has
     /// no way to show the spinner the button does.
     private var availableCommands: [TextOperation] {
-        let commands = isOrganizing ? Menus.all : Menus.all + [Self.organizeCommand]
+        let commands = isOrganizing ? Menus.all : Menus.all + Self.organizeCommands
         return commands.filter { $0.isEnabled(for: kind) }
     }
 
@@ -184,7 +189,7 @@ struct ContentView: View {
     }
 
     private func run(_ operation: TextOperation) {
-        guard operation.id != Self.organizeCommand.id else { return organize() }
+        if let target = Self.organizeTarget(of: operation) { return organize(target) }
         do {
             try editor.apply(operation.label, operation.run)
             formatError = nil
@@ -193,11 +198,17 @@ struct ContentView: View {
         }
     }
 
-    private func organize() {
+    /// The palette's Organize rows carry their target in the id.
+    private static func organizeTarget(of operation: TextOperation) -> OrganizeTarget? {
+        guard operation.id.hasPrefix(organizePrefix) else { return nil }
+        return OrganizeTarget(rawValue: String(operation.id.dropFirst(organizePrefix.count)))
+    }
+
+    private func organize(_ target: OrganizeTarget) {
         isOrganizing = true
         Task { @MainActor in
             do {
-                try await editor.apply("Organize", Organizer.markdown)
+                try await editor.apply("Organize") { try await Organizer.rewrite($0, as: target) }
                 formatError = nil
             } catch {
                 formatError = error.localizedDescription
