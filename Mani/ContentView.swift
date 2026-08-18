@@ -9,7 +9,7 @@ struct ContentView: View {
     @State private var isOrganizing = false
     @State private var isSearching = false
     @State private var isStripping = false
-    @State private var strip = StripController()
+    @State private var strip = FindController()
 
     private static let organizePrefix = "organize."
 
@@ -247,7 +247,7 @@ struct ContentView: View {
     }
 
     private func stripRanges(_ ranges: [NSRange]) {
-        editor.replace(ranges, with: "", actionName: "Strip")
+        editor.replace(ranges.map { (range: $0, string: "") }, actionName: "Strip")
     }
 
     private func organize(_ target: OrganizeTarget) {
