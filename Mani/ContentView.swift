@@ -8,6 +8,8 @@ struct ContentView: View {
     @State private var copyFeedbackTask: Task<Void, Never>?
     @State private var isOrganizing = false
     @State private var isSearching = false
+    @State private var isStripping = false
+    @State private var strip = StripController()
 
     private static let organizePrefix = "organize."
 
@@ -18,6 +20,12 @@ struct ContentView: View {
                       label: "Organize as \(target.label)", help: target.help) { $0 }
     }
 
+    /// The same sentinel trick, for a command that opens a bar instead of
+    /// transforming anything itself.
+    private static let stripCommand = TextOperation(
+        id: "strip", label: "Strip Text\u{2026}",
+        help: "Find every occurrence of a string or pattern and remove it") { $0 }
+
     /// Cached, because every menu item and every palette row asks whether it
     /// applies: as a computed property this ran detection some forty-five times
     /// per keystroke. It is recomputed only when the text or the selection
@@ -27,6 +35,11 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             EditorTextView(text: $text, controller: editor)
+            if isStripping {
+                Divider()
+                StripBar(text: text, editor: editor, controller: strip,
+                         onStrip: stripRanges, onDismiss: closeStrip)
+            }
             if let formatError {
                 errorBanner(formatError)
             }
@@ -87,6 +100,7 @@ struct ContentView: View {
     @ViewBuilder
     private var editingControls: some View {
         Group {
+            stripButton
             Menu("Format") { items(Menus.format) }
                 .fixedSize()
                 .help("Pretty-print structured data, or the selection if there is one")
@@ -134,6 +148,14 @@ struct ContentView: View {
             .monospacedDigit()
     }
 
+    private var stripButton: some View {
+        Button(action: toggleStrip) {
+            Label("Strip", systemImage: "scissors").labelStyle(.iconOnly)
+        }
+        .keyboardShortcut("s", modifiers: [.command, .shift])
+        .help("Find and strip a string or pattern (\u{21E7}\u{2318}S)")
+    }
+
     private var copyButton: some View {
         Button {
             copyAll()
@@ -175,7 +197,7 @@ struct ContentView: View {
     /// Organize is left out while one is already running, since the palette has
     /// no way to show the spinner the button does.
     private var availableCommands: [TextOperation] {
-        let commands = isOrganizing ? Menus.all : Menus.all + Self.organizeCommands
+        let commands = Menus.all + [Self.stripCommand] + (isOrganizing ? [] : Self.organizeCommands)
         return commands.filter { $0.isEnabled(for: kind) }
     }
 
@@ -189,6 +211,7 @@ struct ContentView: View {
     }
 
     private func run(_ operation: TextOperation) {
+        if operation.id == Self.stripCommand.id { return openStrip() }
         if let target = Self.organizeTarget(of: operation) { return organize(target) }
         do {
             try editor.apply(operation.label, operation.run)
@@ -202,6 +225,29 @@ struct ContentView: View {
     private static func organizeTarget(of operation: TextOperation) -> OrganizeTarget? {
         guard operation.id.hasPrefix(organizePrefix) else { return nil }
         return OrganizeTarget(rawValue: String(operation.id.dropFirst(organizePrefix.count)))
+    }
+
+    private func toggleStrip() {
+        isStripping ? closeStrip() : openStrip()
+    }
+
+    /// Opening on a selection fills the field with it, which is the common case:
+    /// you found the thing you want gone, now get rid of all of them.
+    private func openStrip() {
+        if let selected = editor.selectedText, !selected.contains("\n") {
+            strip.pattern.text = selected
+            strip.pattern.mode = .plain
+        }
+        isStripping = true
+    }
+
+    private func closeStrip() {
+        isStripping = false
+        editor.focus()
+    }
+
+    private func stripRanges(_ ranges: [NSRange]) {
+        editor.replace(ranges, with: "", actionName: "Strip")
     }
 
     private func organize(_ target: OrganizeTarget) {

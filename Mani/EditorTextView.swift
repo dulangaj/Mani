@@ -64,6 +64,58 @@ final class EditorController {
         textView.undoManager?.setActionName(actionName)
         textView.setSelectedRange(NSRange(location: range.location, length: (output as NSString).length))
     }
+    /// Replaces every range with `replacement`, as one undo step. The ranges are
+    /// applied back to front so the earlier ones stay valid as the text shrinks.
+    func replace(_ ranges: [NSRange], with replacement: String, actionName: String) {
+        guard let textView, !ranges.isEmpty else { return }
+        let ordered = ranges.sorted { $0.location < $1.location }
+        guard textView.shouldChangeText(inRanges: ordered as [NSValue],
+                                        replacementStrings: ordered.map { _ in replacement }) else { return }
+        for range in ordered.reversed() {
+            textView.textStorage?.replaceCharacters(in: range, with: replacement)
+        }
+        textView.didChangeText()
+        textView.undoManager?.setActionName(actionName)
+    }
+
+    /// Scrolls a range into view without selecting it, which would both paint
+    /// over the highlight and quietly narrow every menu operation to it.
+    func reveal(_ range: NSRange) {
+        textView?.scrollRangeToVisible(range)
+    }
+
+    /// Paints every match, as a TextKit 2 rendering attribute rather than a real
+    /// one, so the document and its undo stack stay untouched. Painting is per
+    /// range and invalidates layout each time, so a pattern with thousands of
+    /// hits shows the first few hundred; the strip bar still counts them all.
+    ///
+    /// `current` is painted last, and in red, so the hit the strip bar is
+    /// sitting on reads differently from the rest of them.
+    func highlight(_ ranges: [NSRange], current: NSRange? = nil) {
+        guard let layout = textView?.textLayoutManager,
+              let content = layout.textContentManager else { return }
+        for key in [NSAttributedString.Key.backgroundColor, .foregroundColor] {
+            layout.removeRenderingAttribute(key, for: content.documentRange)
+        }
+        // Removing an attribute does not repaint what was already drawn, and
+        // invalidating discards whatever is set at the time, so the clear has to
+        // happen before the new highlight goes on.
+        layout.invalidateRenderingAttributes(for: content.documentRange)
+        func paint(_ range: NSRange, _ background: NSColor, _ foreground: NSColor) {
+            guard let textRange = content.textRange(range) else { return }
+            layout.addRenderingAttribute(.backgroundColor, value: background, for: textRange)
+            layout.addRenderingAttribute(.foregroundColor, value: foreground, for: textRange)
+        }
+        // The system find colour, specified to be read with black text: a
+        // translucent wash is invisible against monospaced text.
+        for range in ranges.prefix(500) {
+            paint(range, .findHighlightColor, .black)
+        }
+        if let current {
+            paint(current, .systemRed, .white)
+        }
+    }
+
 }
 
 /// Plain-text NSTextView host: monospaced, no smart substitutions, with the
@@ -115,5 +167,15 @@ struct EditorTextView: NSViewRepresentable {
         func textViewDidChangeSelection(_ notification: Notification) {
             parent.controller.selectionChanged()
         }
+    }
+}
+
+private extension NSTextContentManager {
+    /// TextKit 2 addresses text by opaque locations; everything else here, and
+    /// every transform, speaks `NSRange`.
+    func textRange(_ range: NSRange) -> NSTextRange? {
+        guard let start = location(documentRange.location, offsetBy: range.location),
+              let end = location(start, offsetBy: range.length) else { return nil }
+        return NSTextRange(location: start, end: end)
     }
 }
