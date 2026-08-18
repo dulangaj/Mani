@@ -10,6 +10,9 @@ import AppKit
 /// built on it so far.
 struct StripBar: View {
     let text: String
+    /// The highlight and scroll target, handed straight to `FindBar`. Edits go
+    /// out through `onStrip` instead, so `ContentView` keeps the one path that
+    /// touches the document.
     let editor: EditorController
     let controller: FindController
     let onStrip: ([NSRange]) -> Void

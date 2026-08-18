@@ -258,6 +258,57 @@ struct FindRegexTests {
     }
 }
 
+/// The other half of `EditorController.replace`: what goes in where a hit was.
+@Suite("Find patterns, replacement")
+struct FindReplacementTests {
+    private func substitutions(_ needle: FindPattern, in text: String, template: String) throws -> [String] {
+        try needle.replacements(in: text, template: template).map { $0.string }
+    }
+
+    @Test func expandsCaptureGroupsInRegexMode() throws {
+        #expect(try substitutions(pattern(#"(\d+)x(\d+)"#, .regex), in: "2x4 and 10x20", template: "$2x$1")
+            == ["4x2", "20x10"])
+    }
+
+    @Test func readsTheWholeMatchAsDollarZero() throws {
+        #expect(try substitutions(pattern("cat|dog", .regex), in: "cat dog", template: "<$0>")
+            == ["<cat>", "<dog>"])
+    }
+
+    /// In plain mode the template is literal, the same promise the search side
+    /// makes: a user replacing prices with `$5` has typed no pattern syntax.
+    @Test(arguments: ["$5", "$0", "\\1", "a\\b$"])
+    func templatesAreLiteralInPlainMode(_ template: String) throws {
+        #expect(try substitutions(pattern("x"), in: "x", template: template) == [template])
+    }
+
+    @Test func pairsEveryRangeWithItsString() throws {
+        let needle = pattern(#"(a+)b"#, .regex)
+        let text = "aab b ab"
+        let replacements = try needle.replacements(in: text, template: "[$1]")
+        let ranges = try needle.ranges(in: text)
+        #expect(replacements.map { $0.range } == ranges)
+        #expect(replacements.map { $0.string } == ["[aa]", "[a]"])
+    }
+
+    /// What `EditorController.replace` does with the list, minus the view:
+    /// applied back to front, the earlier ranges stay valid as the text
+    /// changes length under them.
+    @Test func appliesCleanlyBackToFront() throws {
+        let text = "aab b ab"
+        var result = text as NSString
+        for (range, string) in try pattern(#"(a+)b"#, .regex).replacements(in: text, template: "[$1]").reversed() {
+            result = result.replacingCharacters(in: range, with: string) as NSString
+        }
+        #expect(result as String == "[aa] b [a]")
+    }
+
+    @Test func dropsEmptyMatchesLikeTheSearchSide() throws {
+        #expect(try pattern("x*", .regex).replacements(in: "abc", template: "-").isEmpty)
+        #expect(try FindPattern().replacements(in: "abc", template: "-").isEmpty)
+    }
+}
+
 @Suite("Find controller")
 @MainActor
 struct FindControllerTests {

@@ -247,7 +247,7 @@ struct ContentView: View {
     }
 
     private func stripRanges(_ ranges: [NSRange]) {
-        editor.replace(ranges.map { ($0, "") }, actionName: "Strip")
+        editor.replace(ranges.map { (range: $0, string: "") }, actionName: "Strip")
     }
 
     private func organize(_ target: OrganizeTarget) {

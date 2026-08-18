@@ -64,6 +64,7 @@ final class EditorController {
         textView.undoManager?.setActionName(actionName)
         textView.setSelectedRange(NSRange(location: range.location, length: (output as NSString).length))
     }
+
     /// Applies every replacement, as one undo step. Each range carries its own
     /// string, so strip (every string empty) and a future replace (each string
     /// from its own match) are the same call. The ranges must be disjoint; they
@@ -73,7 +74,7 @@ final class EditorController {
         guard let textView, !replacements.isEmpty else { return }
         let ordered = replacements.sorted { $0.range.location < $1.range.location }
         guard textView.shouldChangeText(inRanges: ordered.map { NSValue(range: $0.range) },
-                                        replacementStrings: ordered.map(\.string)) else { return }
+                                        replacementStrings: ordered.map { $0.string }) else { return }
         for (range, string) in ordered.reversed() {
             textView.textStorage?.replaceCharacters(in: range, with: string)
         }
@@ -87,8 +88,8 @@ final class EditorController {
         textView?.scrollRangeToVisible(range)
     }
 
-    /// Painting a document's worth of hits is pure cost past the first few
-    /// hundred: the bar still counts them all, and stepping repaints anyway.
+    /// A pattern with thousands of hits shows the first few hundred, plus the
+    /// current one wherever it sits; the bar still counts them all.
     private static let highlightCap = 500
 
     /// Paints every match, as a TextKit 2 rendering attribute rather than a real
@@ -102,6 +103,8 @@ final class EditorController {
         for key in [NSAttributedString.Key.backgroundColor, .foregroundColor] {
             layout.removeRenderingAttribute(key, for: content.documentRange)
         }
+        // Invalidating discards whatever is set at the time, so the clear has
+        // to happen before the new highlight goes on, not after.
         layout.invalidateRenderingAttributes(for: content.documentRange)
         func paint(_ range: NSRange, _ background: NSColor, _ foreground: NSColor) {
             guard let textRange = content.textRange(range) else { return }

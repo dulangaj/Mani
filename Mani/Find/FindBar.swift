@@ -2,8 +2,10 @@ import SwiftUI
 
 /// The find machinery on one line: field, mode, options, count, and the
 /// stepper, with a slot for whatever a feature does to the hits. The strip bar
-/// puts `Strip`/`Strip All` in the slot; a replace bar would put its own field
-/// and buttons there. The bar owns the wiring that every such feature needs —
+/// puts `Strip`/`Strip All` in the slot; a replace bar would put its buttons
+/// there and stack its replacement field on a row of its own beneath, the
+/// shape every editor gives it. The bar owns the wiring that every such
+/// feature needs —
 /// refresh on each keystroke and document edit, highlight every hit, clear the
 /// highlight on the way out — so a new feature writes none of it.
 struct FindBar<Actions: View>: View {
@@ -51,7 +53,7 @@ struct FindBar<Actions: View>: View {
                 Label("Close", systemImage: "xmark").labelStyle(.iconOnly)
             }
             .buttonStyle(.plain)
-            .help("Close the find bar (⎋)")
+            .help("Close the \(prompt.lowercased()) bar (⎋)")
         }
         .padding(8)
         .onAppear {

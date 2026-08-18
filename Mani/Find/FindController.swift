@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// What a find bar is looking for, and where in the list of hits it is
 /// sitting. It holds no text of its own: `refresh(in:)` is called whenever the
